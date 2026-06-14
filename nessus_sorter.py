@@ -402,6 +402,8 @@ class NessusSorterApp(tk.Tk):
             paths = self._input_paths
         else:
             paths = [p.strip() for p in path_text.split(";") if os.path.isfile(p.strip())]
+
+        paths = list(dict.fromkeys(paths))
             
         if not paths:
             messagebox.showerror("No valid files", "Please select valid Nessus CSV files.")

@@ -266,9 +266,11 @@ def write_csv(headers: list, rows: list, filepath: str):
 
 def run_cleanup_pipeline(paths: list, api_key: str, use_ai: bool, log) -> tuple:
     """Read all CSV paths, run cleaning rules (Case 1, 2, and 3), return (first_headers, cleaned_rows)."""
+    # Deduplicate paths while preserving selection order
+    unique_paths = list(dict.fromkeys(paths))
     all_headers = []
     all_rows = []
-    for path in paths:
+    for path in unique_paths:
         log(f"Reading: {os.path.basename(path)}", "info")
         headers, rows = parse_nessus_csv(path)
         if not all_headers:
