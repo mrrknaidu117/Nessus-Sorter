@@ -132,7 +132,8 @@ class NessusSorterApp(tk.Tk):
         self.path_entry.bind("<FocusIn>",  self._file_focus_in)
         self.path_entry.bind("<FocusOut>", self._file_focus_out)
         self.path_entry.pack(side="left", fill="x", expand=True, ipady=7)
-        self._make_btn(fr, "Browse …", self._browse_input, ACCENT).pack(side="left", padx=(8, 0))
+        self._make_btn(fr, "Add File(s) …", self._browse_input, ACCENT).pack(side="left", padx=(8, 0))
+        self._make_btn(fr, "Clear", self._clear_input, DANGER).pack(side="left", padx=(8, 0))
 
         # 2. Sort mode
         self._section_label(pad, "2  SORT MODE")
@@ -363,10 +364,28 @@ class NessusSorterApp(tk.Tk):
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
         )
         if paths:
-            self._input_paths = list(paths)
+            # Parse existing paths from the text entry to preserve any manual edits
+            current_text = self.path_entry.get().strip()
+            if current_text and current_text != PLACEHOLDER_FILE:
+                current_paths = [p.strip() for p in current_text.split(";") if p.strip()]
+            else:
+                current_paths = []
+
+            # Append new paths to the current ones
+            for p in paths:
+                if p not in current_paths:
+                    current_paths.append(p)
+
+            self._input_paths = current_paths
             self.path_entry.config(fg=TEXT)
             self.path_entry.delete(0, "end")
-            self.path_entry.insert(0, "; ".join(paths))
+            self.path_entry.insert(0, "; ".join(self._input_paths))
+
+    def _clear_input(self):
+        self._input_paths = []
+        self.path_entry.delete(0, "end")
+        self.path_entry.config(fg=TEXT_MUTED)
+        self.path_entry.insert(0, PLACEHOLDER_FILE)
 
     # ── PROCESSING ────────────────────────────────────────────────────────────
 
