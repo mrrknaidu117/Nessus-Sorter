@@ -238,6 +238,14 @@ class NessusSorterApp(tk.Tk):
         self.export_btn.pack(side="right")
         self.export_btn.config(state="disabled")
 
+        self.open_folder_btn = self._make_btn(
+            bot, "📂   Open Folder",
+            self._open_export_folder, ACCENT,
+            font=("Segoe UI", 11, "bold"), pady=10
+        )
+        self.open_folder_btn.pack(side="right", padx=(0, 8))
+        self.open_folder_btn.config(state="disabled")
+
     # ── WIDGET HELPERS ────────────────────────────────────────────────────────
 
     def _section_label(self, parent, text):
@@ -424,6 +432,7 @@ class NessusSorterApp(tk.Tk):
 
         self._clear_log()
         self.export_btn.config(state="disabled")
+        self.open_folder_btn.config(state="disabled")
         self.result_rows = []
         for w in self.stats_frame.winfo_children():
             w.destroy()
@@ -489,6 +498,16 @@ class NessusSorterApp(tk.Tk):
         self.log_text.configure(state="disabled")
         self.update_idletasks()
 
+        # Write to log file
+        log_path = os.path.join(os.path.dirname(__file__), "nessus_sorter.log")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_prefix = {"ok": "[SUCCESS] ", "warn": "[WARNING] ", "err": "[ERROR]   ", "info": "[INFO]    "}.get(tag, "[INFO]    ")
+        try:
+            with open(log_path, "a", encoding="utf-8") as lf:
+                lf.write(f"{timestamp} {log_prefix}{message}\n")
+        except Exception:
+            pass
+
     def _clear_log(self):
         self.log_text.configure(state="normal")
         self.log_text.delete("1.0", "end")
@@ -512,11 +531,23 @@ class NessusSorterApp(tk.Tk):
         try:
             write_csv(self.result_hdrs, self.result_rows, out_path)
             self._log(f"Exported → {out_path}", "ok")
+            
+            # Save export folder and enable open folder button
+            self.last_export_dir = os.path.dirname(out_path)
+            self.open_folder_btn.config(state="normal")
+            
             messagebox.showinfo("Export successful",
                                 f"Cleaned CSV saved to:\n{out_path}")
         except Exception as exc:
             self._log(f"Export failed: {exc}", "err")
             messagebox.showerror("Export failed", str(exc))
+
+    def _open_export_folder(self):
+        if hasattr(self, "last_export_dir") and self.last_export_dir:
+            try:
+                os.startfile(self.last_export_dir)
+            except Exception as exc:
+                messagebox.showerror("Error", f"Could not open folder: {exc}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

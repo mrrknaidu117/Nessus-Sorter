@@ -2,6 +2,7 @@ import csv
 import json
 import os
 import re
+import time
 from datetime import datetime
 import urllib.request
 import urllib.error
@@ -25,20 +26,28 @@ def call_gemini(prompt: str, api_key: str) -> str:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0, "maxOutputTokens": 300}
     }).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"Gemini HTTP {e.code}: {body[:300]}")
-    except Exception as e:
-        raise RuntimeError(str(e))
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < max_retries - 1:
+                # Rate limit hit, wait (exponential backoff) and retry
+                wait_time = 2 * (attempt + 1)
+                time.sleep(wait_time)
+                continue
+            body = e.read().decode("utf-8", errors="ignore")
+            raise RuntimeError(f"Gemini HTTP {e.code}: {body[:300]}")
+        except Exception as e:
+            raise RuntimeError(str(e))
 
 
 def validate_gemini_key(api_key: str):
@@ -60,6 +69,17 @@ def parse_nessus_csv(filepath: str):
     with open(filepath, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         headers = list(reader.fieldnames or [])
+        
+        # Schema Validation: Check for required Nessus columns (case-insensitive)
+        lower_headers = [h.lower() for h in headers]
+        required = ["plugin id", "name", "host", "risk"]
+        missing = [r for r in required if r not in lower_headers]
+        if missing:
+            raise ValueError(
+                f"Missing required columns: {', '.join([m.title() for m in missing])}. "
+                "Please make sure you selected a valid Nessus CSV report."
+            )
+            
         for row in reader:
             rows.append(dict(row))
     return headers, rows
